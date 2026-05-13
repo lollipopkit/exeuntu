@@ -213,6 +213,12 @@ RUN printf '%s\n' \
     'fish_add_path ~/env/flutter/bin' \
     'fish_add_path ~/.bun/bin' \
     'fish_add_path ~/.cargo/bin' \
+    'fish_add_path /home/linuxbrew/.linuxbrew/bin' \
+    'fish_add_path /home/linuxbrew/.linuxbrew/sbin' \
+    '' \
+    'if test -x /home/linuxbrew/.linuxbrew/bin/brew' \
+    '    /home/linuxbrew/.linuxbrew/bin/brew shellenv | source' \
+    'end' \
     '' \
     '# Change to /opt/homebrew/bin/fish if using Homebrew Fish' \
     'set -x SHELL /usr/bin/fish' \
@@ -238,6 +244,9 @@ RUN fish -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main
 # Install Rust for the default user.
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --profile default
+
+# Install Homebrew on Linux for the default user.
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Configure git to use 'main' as default branch name
 RUN git config --global init.defaultBranch main
