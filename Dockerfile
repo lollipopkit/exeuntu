@@ -3,7 +3,7 @@ FROM docker.io/chromedp/headless-shell:stable AS chrome
 
 FROM ubuntu:24.04
 
-# Switch from dash to bash by default.
+# Use bash for Docker RUN instructions.
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 
@@ -174,6 +174,7 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	groupmod -n lk ubuntu && \
 	mv /home/ubuntu /home/lk && \
 	usermod -d /home/lk -s /usr/bin/fish lk && \
+	usermod -s /usr/bin/fish root && \
 	usermod -aG sudo lk && \
 	usermod -aG docker lk && \
 	sed -i 's/^ubuntu:/lk:/' /etc/subuid /etc/subgid && \
@@ -184,6 +185,7 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	touch /var/lib/systemd/linger/lk
 
 ENV EXEUNTU=1
+ENV SHELL=/usr/bin/fish
 
 # https://github.com/trfore/docker-ubuntu2404-systemd/blob/main/Dockerfile suggests the following
 # might be useful?
