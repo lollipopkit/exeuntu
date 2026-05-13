@@ -235,6 +235,10 @@ RUN printf '%s\n' \
 # Install Fisher and the shared exe.dev fish plugin set.
 RUN fish -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source; fisher install jorgebucaran/fisher; fisher install (curl -fsSL https://raw.githubusercontent.com/lollipopkit/fish-cfg/main/fish/fish_plugins | string split \n)'
 
+# Install Rust for the default user.
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --profile default
+
 # Configure git to use 'main' as default branch name
 RUN git config --global init.defaultBranch main
 
