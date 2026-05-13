@@ -24,7 +24,7 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirror://mirrors.ubuntu.c
 	mandb -c && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		ca-certificates wget ripgrep \
-		git jq sqlite3 curl vim neovim lsof iproute2 less nginx \
+		git jq sqlite3 curl vim neovim fish lsof iproute2 less nginx \
 		make python3-pip python-is-python3 tree net-tools file build-essential \
 		pipx psmisc bsdmainutils sudo socat \
 		openssh-server openssh-client \
@@ -173,7 +173,7 @@ RUN rm /etc/systemd/system/multi-user.target.wants/console-setup.service \
 RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	groupmod -n lk ubuntu && \
 	mv /home/ubuntu /home/lk && \
-	usermod -d /home/lk lk && \
+	usermod -d /home/lk -s /usr/bin/fish lk && \
 	usermod -aG sudo lk && \
 	usermod -aG docker lk && \
 	sed -i 's/^ubuntu:/lk:/' /etc/subuid /etc/subgid && \
@@ -194,8 +194,8 @@ ENV EXEUNTU=1
 COPY --from=chrome /headless-shell /headless-shell
 ENV PATH="/usr/local/bin:/headless-shell:${PATH}"
 
-RUN mkdir -p /home/lk && \
-    chown lk:lk /home/lk
+RUN mkdir -p /home/lk/.config/fish && \
+    chown -R lk:lk /home/lk
 
 USER lk
 
@@ -206,6 +206,34 @@ WORKDIR /home/lk
 RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/lk/.bashrc && \
     echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.bashrc && \
     echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.profile
+RUN printf '%s\n' \
+    'fish_add_path ~/.local/bin' \
+    'fish_add_path ~/go/bin' \
+    'fish_add_path /usr/local/go/bin' \
+    'fish_add_path ~/env/flutter/bin' \
+    'fish_add_path ~/.bun/bin' \
+    'fish_add_path ~/.cargo/bin' \
+    '' \
+    '# Change to /opt/homebrew/bin/fish if using Homebrew Fish' \
+    'set -x SHELL /usr/bin/fish' \
+    'set -x TZ Asia/Shanghai' \
+    'set -x LC_ALL en_US.UTF-8' \
+    'set -x EDITOR vim' \
+    'set -x FIC $HOME/.config/fish/config.fish' \
+    'set -x FIH $HOME/.local/share/fish/fish_history' \
+    'set -gx NVM_DIR $HOME/.nvm' \
+    'set -gx BUN_INSTALL "$HOME/.bun"' \
+    '' \
+    'set -g fish_greeting' \
+    'set -g sponge_successful_exit_codes 0 130 255' \
+    'set -g sponge_purge_only_on_exit true' \
+    "set -g hydro_symbol_prompt '>'" \
+    "set -g hydro_symbol_git_dirty '!'" \
+    'set -gx XDG_RUNTIME_DIR "/run/user/"(id -u)' \
+    > /home/lk/.config/fish/config.fish
+
+# Install Fisher and the shared exe.dev fish plugin set.
+RUN fish -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source; fisher install jorgebucaran/fisher; fisher install (curl -fsSL https://raw.githubusercontent.com/lollipopkit/fish-cfg/main/fish/fish_plugins | string split \n)'
 
 # Configure git to use 'main' as default branch name
 RUN git config --global init.defaultBranch main
@@ -219,6 +247,10 @@ RUN rm -rf /etc/update-motd.d/* /etc/motd && touch /home/lk/.hushlogin && chown 
 # Add custom MOTD to lk's .bashrc (ignores .hushlogin - we handle that ourselves)
 COPY motd-snippet.bash /tmp/motd-snippet.bash
 RUN cat /tmp/motd-snippet.bash >> /home/lk/.bashrc && rm /tmp/motd-snippet.bash
+COPY motd-snippet.fish /tmp/motd-snippet.fish
+RUN cat /tmp/motd-snippet.fish >> /home/lk/.config/fish/config.fish && \
+    rm /tmp/motd-snippet.fish && \
+    chown -R lk:lk /home/lk/.config/fish
 
 # Create systemd oneshot service for /exe.dev/setup script
 COPY exe-setup.service /etc/systemd/system/exe-setup.service
