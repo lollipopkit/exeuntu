@@ -194,8 +194,8 @@ ENV EXEUNTU=1
 COPY --from=chrome /headless-shell /headless-shell
 ENV PATH="/usr/local/bin:/headless-shell:${PATH}"
 
-RUN mkdir -p /home/lk /home/lk/.config/shelley && \
-    chown lk:lk /home/lk /home/lk/.config /home/lk/.config/shelley
+RUN mkdir -p /home/lk && \
+    chown lk:lk /home/lk
 
 USER lk
 
@@ -210,7 +210,7 @@ RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/lk/.bashrc && \
 # Configure git to use 'main' as default branch name
 RUN git config --global init.defaultBranch main
 
-# Switch back to root to install systemd service
+# Switch back to root to install systemd services
 USER root
 
 # Disable Ubuntu's default MOTD (the sudo hint, etc.)
@@ -219,13 +219,6 @@ RUN rm -rf /etc/update-motd.d/* /etc/motd && touch /home/lk/.hushlogin && chown 
 # Add custom MOTD to lk's .bashrc (ignores .hushlogin - we handle that ourselves)
 COPY motd-snippet.bash /tmp/motd-snippet.bash
 RUN cat /tmp/motd-snippet.bash >> /home/lk/.bashrc && rm /tmp/motd-snippet.bash
-
-# Create systemd socket and service for Shelley (socket activation).
-# The shelley binary itself is installed at vm creation.
-COPY shelley.socket /etc/systemd/system/shelley.socket
-COPY shelley.service /etc/systemd/system/shelley.service
-RUN chmod 644 /etc/systemd/system/shelley.socket /etc/systemd/system/shelley.service && \
-    systemctl enable shelley.socket
 
 # Create systemd oneshot service for /exe.dev/setup script
 COPY exe-setup.service /etc/systemd/system/exe-setup.service
@@ -254,13 +247,11 @@ RUN ARCH=$(uname -m) && \
 RUN mkdir -p /home/lk/.claude /home/lk/.codex /home/lk/.pi && \
     chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi
 
-# Copy LLM agent instructions to Claude, Codex, and Shelley config directories
-# Shelley uses ~/.config/shelley/ (XDG convention, directory already created above)
-COPY AGENTS.md /home/lk/.config/shelley/AGENTS.md
-RUN chown lk:lk /home/lk/.config/shelley/AGENTS.md && \
-    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.claude/CLAUDE.md && \
-    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.codex/AGENTS.md && \
-    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.pi/AGENTS.md
+# Copy LLM agent instructions to Claude, Codex, and Pi config directories
+COPY AGENTS.md /home/lk/.codex/AGENTS.md
+RUN cp /home/lk/.codex/AGENTS.md /home/lk/.claude/CLAUDE.md && \
+    cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
+    chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi
 
 # Install Claude to the native location (~/.local/bin) so auto-upgrades work correctly.
 # Symlink to /usr/local/bin for system-wide PATH access.
@@ -326,8 +317,8 @@ RUN chmod 644 /var/www/html/index.html
 COPY xterm-ghostty.terminfo /tmp/xterm-ghostty.terminfo
 RUN tic -x - < /tmp/xterm-ghostty.terminfo && rm /tmp/xterm-ghostty.terminfo
 
-# Expose the web server ports
-EXPOSE 8000 9999
+# Expose the web server port
+EXPOSE 8000
 
 LABEL "exe.dev/login-user"="lk"
 CMD ["/usr/local/bin/init"]
