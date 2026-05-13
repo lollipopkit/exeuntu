@@ -175,6 +175,8 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	mv /home/ubuntu /home/lk && \
 	usermod -d /home/lk -s /usr/bin/fish lk && \
 	usermod -s /usr/bin/fish root && \
+	chsh -s /usr/bin/fish lk && \
+	chsh -s /usr/bin/fish root && \
 	usermod -aG sudo lk && \
 	usermod -aG docker lk && \
 	sed -i 's/^ubuntu:/lk:/' /etc/subuid /etc/subgid && \
@@ -182,7 +184,9 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	echo 'Defaults:lk verifypw=any' >> /etc/sudoers && \
 	# Manually enable linger, this should autopopulate /run/user/1000
 	mkdir -p /var/lib/systemd/linger && \
-	touch /var/lib/systemd/linger/lk
+	touch /var/lib/systemd/linger/lk && \
+	getent passwd lk | grep -q ':/usr/bin/fish$' && \
+	getent passwd root | grep -q ':/usr/bin/fish$'
 
 ENV EXEUNTU=1
 ENV SHELL=/usr/bin/fish
