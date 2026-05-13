@@ -169,19 +169,19 @@ RUN rm /etc/systemd/system/multi-user.target.wants/console-setup.service \
 		echo 'Storage=persistent' >> /etc/systemd/journald.conf.d/persistent.conf && \
 	systemctl set-default multi-user.target
 
-# Modify existing ubuntu user (UID 1000) to become exedev user
-RUN usermod -l exedev -c "exe.dev user" ubuntu && \
-	groupmod -n exedev ubuntu && \
-	mv /home/ubuntu /home/exedev && \
-	usermod -d /home/exedev exedev && \
-	usermod -aG sudo exedev && \
-	usermod -aG docker exedev && \
-	sed -i 's/^ubuntu:/exedev:/' /etc/subuid /etc/subgid && \
-	echo 'exedev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
-	echo 'Defaults:exedev verifypw=any' >> /etc/sudoers && \
+# Modify existing ubuntu user (UID 1000) to become the default lk user
+RUN usermod -l lk -c "exe.dev user" ubuntu && \
+	groupmod -n lk ubuntu && \
+	mv /home/ubuntu /home/lk && \
+	usermod -d /home/lk lk && \
+	usermod -aG sudo lk && \
+	usermod -aG docker lk && \
+	sed -i 's/^ubuntu:/lk:/' /etc/subuid /etc/subgid && \
+	echo 'lk ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+	echo 'Defaults:lk verifypw=any' >> /etc/sudoers && \
 	# Manually enable linger, this should autopopulate /run/user/1000
 	mkdir -p /var/lib/systemd/linger && \
-	touch /var/lib/systemd/linger/exedev
+	touch /var/lib/systemd/linger/lk
 
 ENV EXEUNTU=1
 
@@ -194,18 +194,18 @@ ENV EXEUNTU=1
 COPY --from=chrome /headless-shell /headless-shell
 ENV PATH="/usr/local/bin:/headless-shell:${PATH}"
 
-RUN mkdir -p /home/exedev /home/exedev/.config/shelley && \
-    chown exedev:exedev /home/exedev /home/exedev/.config /home/exedev/.config/shelley
+RUN mkdir -p /home/lk /home/lk/.config/shelley && \
+    chown lk:lk /home/lk /home/lk/.config /home/lk/.config/shelley
 
-USER exedev
+USER lk
 
-WORKDIR /home/exedev
+WORKDIR /home/lk
 
 # Update PATH in .bashrc to include .local/bin and set XDG_RUNTIME_DIR for systemd user services
 # XDG paths are not autopopulated despite the presense of libpam-systemd. Manually add them here.
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/exedev/.bashrc && \
-    echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/exedev/.bashrc && \
-    echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/exedev/.profile
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/lk/.bashrc && \
+    echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.bashrc && \
+    echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.profile
 
 # Configure git to use 'main' as default branch name
 RUN git config --global init.defaultBranch main
@@ -214,11 +214,11 @@ RUN git config --global init.defaultBranch main
 USER root
 
 # Disable Ubuntu's default MOTD (the sudo hint, etc.)
-RUN rm -rf /etc/update-motd.d/* /etc/motd && touch /home/exedev/.hushlogin && chown exedev:exedev /home/exedev/.hushlogin
+RUN rm -rf /etc/update-motd.d/* /etc/motd && touch /home/lk/.hushlogin && chown lk:lk /home/lk/.hushlogin
 
-# Add custom MOTD to exedev's .bashrc (ignores .hushlogin - we handle that ourselves)
+# Add custom MOTD to lk's .bashrc (ignores .hushlogin - we handle that ourselves)
 COPY motd-snippet.bash /tmp/motd-snippet.bash
-RUN cat /tmp/motd-snippet.bash >> /home/exedev/.bashrc && rm /tmp/motd-snippet.bash
+RUN cat /tmp/motd-snippet.bash >> /home/lk/.bashrc && rm /tmp/motd-snippet.bash
 
 # Create systemd socket and service for Shelley (socket activation).
 # The shelley binary itself is installed at vm creation.
@@ -251,29 +251,29 @@ RUN ARCH=$(uname -m) && \
     chmod +x /usr/local/bin/codex
 
 # Create config directories for LLM agents
-RUN mkdir -p /home/exedev/.claude /home/exedev/.codex /home/exedev/.pi && \
-    chown -R exedev:exedev /home/exedev/.claude /home/exedev/.codex /home/exedev/.pi
+RUN mkdir -p /home/lk/.claude /home/lk/.codex /home/lk/.pi && \
+    chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi
 
 # Copy LLM agent instructions to Claude, Codex, and Shelley config directories
 # Shelley uses ~/.config/shelley/ (XDG convention, directory already created above)
-COPY AGENTS.md /home/exedev/.config/shelley/AGENTS.md
-RUN chown exedev:exedev /home/exedev/.config/shelley/AGENTS.md && \
-    ln -s /home/exedev/.config/shelley/AGENTS.md /home/exedev/.claude/CLAUDE.md && \
-    ln -s /home/exedev/.config/shelley/AGENTS.md /home/exedev/.codex/AGENTS.md && \
-    ln -s /home/exedev/.config/shelley/AGENTS.md /home/exedev/.pi/AGENTS.md
+COPY AGENTS.md /home/lk/.config/shelley/AGENTS.md
+RUN chown lk:lk /home/lk/.config/shelley/AGENTS.md && \
+    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.claude/CLAUDE.md && \
+    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.codex/AGENTS.md && \
+    ln -s /home/lk/.config/shelley/AGENTS.md /home/lk/.pi/AGENTS.md
 
 # Install Claude to the native location (~/.local/bin) so auto-upgrades work correctly.
 # Symlink to /usr/local/bin for system-wide PATH access.
-RUN mkdir -p /home/exedev/.local/bin && \
+RUN mkdir -p /home/lk/.local/bin && \
     ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') && \
     PLATFORM="linux-${ARCH}" && \
     STABLE_VERSION=$(curl -fsSL https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/stable) && \
     EXPECTED_HASH=$(curl -fsSL "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${STABLE_VERSION}/manifest.json" | jq -r ".platforms[\"${PLATFORM}\"].checksum") && \
-    curl -fsSL "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${STABLE_VERSION}/${PLATFORM}/claude" -o /home/exedev/.local/bin/claude && \
-    echo "${EXPECTED_HASH}  /home/exedev/.local/bin/claude" | sha256sum -c - && \
-    chmod +x /home/exedev/.local/bin/claude && \
-    chown -R exedev:exedev /home/exedev/.local && \
-    ln -s /home/exedev/.local/bin/claude /usr/local/bin/claude
+    curl -fsSL "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${STABLE_VERSION}/${PLATFORM}/claude" -o /home/lk/.local/bin/claude && \
+    echo "${EXPECTED_HASH}  /home/lk/.local/bin/claude" | sha256sum -c - && \
+    chmod +x /home/lk/.local/bin/claude && \
+    chown -R lk:lk /home/lk/.local && \
+    ln -s /home/lk/.local/bin/claude /usr/local/bin/claude
 
 # Install pi (pi-coding-agent) standalone binary
 ARG PI_VERSION=
@@ -282,21 +282,21 @@ RUN ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') && \
         PI_VERSION=$(curl -fsSL https://api.github.com/repos/badlogic/pi-mono/releases/latest | jq -r '.tag_name'); \
     fi && \
     curl -fsSL "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}/pi-linux-${ARCH}.tar.gz" | \
-    tar xz -C /home/exedev/.local/ && \
-    ln -s /home/exedev/.local/pi/pi /home/exedev/.local/bin/pi && \
-    chown -R exedev:exedev /home/exedev/.local/pi && \
-    ln -s /home/exedev/.local/bin/pi /usr/local/bin/pi
+    tar xz -C /home/lk/.local/ && \
+    ln -s /home/lk/.local/pi/pi /home/lk/.local/bin/pi && \
+    chown -R lk:lk /home/lk/.local/pi && \
+    ln -s /home/lk/.local/bin/pi /usr/local/bin/pi
 
 # Install pi exe.dev extension (LLM gateway + environment context).
 # Pre-fetch catalog.json so the first request Just Works immediately.
 # Each subsequent pi run will update the catalog.
-COPY pi-extension/ /home/exedev/.pi/agent/extensions/exe-dev/
+COPY pi-extension/ /home/lk/.pi/agent/extensions/exe-dev/
 RUN curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors --max-time 30 \
       https://exe.dev/llm-gateway-models.json \
-      -o /home/exedev/.pi/agent/extensions/exe-dev/catalog.json && \
+      -o /home/lk/.pi/agent/extensions/exe-dev/catalog.json && \
     jq -e '.schemaVersion | numbers' \
-      /home/exedev/.pi/agent/extensions/exe-dev/catalog.json > /dev/null
-RUN chown -R exedev:exedev /home/exedev/.pi/agent
+      /home/lk/.pi/agent/extensions/exe-dev/catalog.json > /dev/null
+RUN chown -R lk:lk /home/lk/.pi/agent
 
 # Pre-install fd at the path pi checks first (~/.pi/agent/bin/fd), so pi
 # doesn't try (and on a fresh VM, often fail with a GitHub API 403) to
@@ -308,14 +308,14 @@ RUN ARCH=$(uname -m) && \
         *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
     esac && \
     FD_VERSION=$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest | jq -r '.tag_name') && \
-    mkdir -p /home/exedev/.pi/agent/bin && \
+    mkdir -p /home/lk/.pi/agent/bin && \
     TMPDIR=$(mktemp -d) && \
     curl -fsSL "https://github.com/sharkdp/fd/releases/download/${FD_VERSION}/fd-${FD_VERSION}-${FD_ARCH}.tar.gz" | \
         tar -xz -C "${TMPDIR}" && \
-    mv "${TMPDIR}/fd-${FD_VERSION}-${FD_ARCH}/fd" /home/exedev/.pi/agent/bin/fd && \
+    mv "${TMPDIR}/fd-${FD_VERSION}-${FD_ARCH}/fd" /home/lk/.pi/agent/bin/fd && \
     rm -rf "${TMPDIR}" && \
-    chmod 0755 /home/exedev/.pi/agent/bin/fd && \
-    chown -R exedev:exedev /home/exedev/.pi/agent/bin
+    chmod 0755 /home/lk/.pi/agent/bin/fd && \
+    chown -R lk:lk /home/lk/.pi/agent/bin
 
 # Custom nginx config and index page (nginx is installed but disabled by default)
 COPY nginx.conf /etc/nginx/sites-available/default
@@ -329,5 +329,5 @@ RUN tic -x - < /tmp/xterm-ghostty.terminfo && rm /tmp/xterm-ghostty.terminfo
 # Expose the web server ports
 EXPOSE 8000 9999
 
-LABEL "exe.dev/login-user"="exedev"
+LABEL "exe.dev/login-user"="lk"
 CMD ["/usr/local/bin/init"]
