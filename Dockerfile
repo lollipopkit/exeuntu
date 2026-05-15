@@ -273,6 +273,7 @@ RUN mkdir -p /home/lk/.claude /home/lk/.codex /home/lk/.pi && \
 
 # Copy LLM agent instructions to Claude, Codex, and Pi config directories
 COPY AGENTS.md /home/lk/.codex/AGENTS.md
+COPY --chown=lk:lk codex-config.toml /home/lk/.codex/config.toml
 RUN cp /home/lk/.codex/AGENTS.md /home/lk/.claude/CLAUDE.md && \
     cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
     chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi

@@ -1,0 +1,67 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "medium"
+
+web_search = "live"
+# developer_instructions = """输出必须使用中文,专业名词可保留原文;"""
+hide_agent_reasoning = true
+
+# approval_policy = "untrusted"
+sandbox_mode = "workspace-write"
+approvals_reviewer = "guardian_subagent"
+approval_policy = "on-request"
+
+suppress_unstable_features_warning = true
+
+[sandbox_workspace_write]
+network_access = true
+
+[feedback]
+enabled = false
+
+[features]
+apps = false
+unified_exec = true
+shell_snapshot = true
+steer = true
+guardian_approval = true
+multi_agent = true
+memories = true
+prevent_idle_sleep = true
+terminal_resize_reflow = true
+goals = true
+
+[model_providers.cliproxyapi]
+name = "cliproxyapi"
+base_url = "http://100.103.213.81:8317/v1"
+wire_api = "responses"
+env_key = "PIMM_API_KEY"
+
+[profiles.g5]
+model_provider = "cliproxyapi"
+model = "gpt-5.5"
+
+[profiles.g5cs]
+model_provider = "cliproxyapi"
+model = "gpt-5.3-codex-spark"
+
+[profiles.g5cs.features]
+image_generation = false
+
+[notice]
+hide_gpt5_1_migration_prompt = true
+"hide_gpt-5.1-codex-max_migration_prompt" = true
+hide_rate_limit_model_nudge = true
+
+[notice.model_migrations]
+"gpt-5.1-codex-max" = "gpt-5.2-codex"
+"gpt-5.3-codex" = "gpt-5.4"
+
+[apps.connector_76869538009648d5b282a4bb21c3d157]
+enabled = false
+
+[tui]
+status_line = ["model-with-reasoning", "context-used", "weekly-limit"]
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
