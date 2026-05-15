@@ -26,6 +26,15 @@ if not command -q npm; and type -q nvm
     nvm use lts
 end
 
+if command -q pi; and command -q npm
+    set -l pi_settings "$HOME/.pi/agent/settings.json"
+    for package_source in npm:pi-models-metadata npm:pi-tab-follow-up npm:pi-autoresearch
+        if not test -f $pi_settings; or not rg -q --fixed-strings "\"$package_source\"" $pi_settings
+            pi install $package_source
+        end
+    end
+end
+
 set -g fish_greeting
 set -g sponge_successful_exit_codes 0 130 255
 set -g sponge_purge_only_on_exit true
