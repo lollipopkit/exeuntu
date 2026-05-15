@@ -191,6 +191,9 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 ENV EXEUNTU=1
 ENV SHELL=/usr/bin/fish
 
+COPY exeuntu-fish.sh /etc/profile.d/exeuntu-fish.sh
+RUN cat /etc/profile.d/exeuntu-fish.sh >> /etc/bash.bashrc
+
 # https://github.com/trfore/docker-ubuntu2404-systemd/blob/main/Dockerfile suggests the following
 # might be useful?
 # STOPSIGNAL SIGRTMIN+3
@@ -212,37 +215,7 @@ WORKDIR /home/lk
 RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/lk/.bashrc && \
     echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.bashrc && \
     echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"' >> /home/lk/.profile
-RUN printf '%s\n' \
-    'fish_add_path ~/.local/bin' \
-    'fish_add_path ~/go/bin' \
-    'fish_add_path /usr/local/go/bin' \
-    'fish_add_path ~/env/flutter/bin' \
-    'fish_add_path ~/.bun/bin' \
-    'fish_add_path ~/.cargo/bin' \
-    'fish_add_path /home/linuxbrew/.linuxbrew/bin' \
-    'fish_add_path /home/linuxbrew/.linuxbrew/sbin' \
-    '' \
-    'if test -x /home/linuxbrew/.linuxbrew/bin/brew' \
-    '    /home/linuxbrew/.linuxbrew/bin/brew shellenv | source' \
-    'end' \
-    '' \
-    '# Change to /opt/homebrew/bin/fish if using Homebrew Fish' \
-    'set -x SHELL /usr/bin/fish' \
-    'set -x TZ Asia/Shanghai' \
-    'set -x LC_ALL en_US.UTF-8' \
-    'set -x EDITOR vim' \
-    'set -x FIC $HOME/.config/fish/config.fish' \
-    'set -x FIH $HOME/.local/share/fish/fish_history' \
-    'set -gx NVM_DIR $HOME/.nvm' \
-    'set -gx BUN_INSTALL "$HOME/.bun"' \
-    '' \
-    'set -g fish_greeting' \
-    'set -g sponge_successful_exit_codes 0 130 255' \
-    'set -g sponge_purge_only_on_exit true' \
-    "set -g hydro_symbol_prompt '>'" \
-    "set -g hydro_symbol_git_dirty '!'" \
-    'set -gx XDG_RUNTIME_DIR "/run/user/"(id -u)' \
-    > /home/lk/.config/fish/config.fish
+COPY --chown=lk:lk config.fish /home/lk/.config/fish/config.fish
 
 # Install Fisher and the shared exe.dev fish plugin set.
 RUN fish -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source; fisher install jorgebucaran/fisher; fisher install (curl -fsSL https://raw.githubusercontent.com/lollipopkit/fish-cfg/main/fish/fish_plugins | string split \n)'
