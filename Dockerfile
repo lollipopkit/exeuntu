@@ -12,6 +12,15 @@ SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirror://mirrors.ubuntu.com/mirrors.txt|' /etc/apt/sources.list && \
         rm -f /etc/dpkg/dpkg.cfg.d/excludes /etc/dpkg/dpkg.cfg.d/01_nodoc && \
 	apt-get update && \
+	# Pull in all available security/bugfix updates for packages already
+	# in the base ubuntu:24.04 image. Without this we ship whatever was
+	# current when Canonical last rebuilt the base layer, which can be
+	# months behind (e.g. nginx Rift, CVE-2026-42945). The weekly cron
+	# rebuild + no-cache will keep this fresh going forward.
+	DEBIAN_FRONTEND=noninteractive apt-get -y \
+		-o Dpkg::Options::=--force-confold \
+		-o Dpkg::Options::=--force-confdef \
+		dist-upgrade && \
 	# Pre-configure debconf to avoid interactive prompts
 	echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
 	# Pre-configure pbuilder to avoid mirror prompt
@@ -188,6 +197,10 @@ RUN usermod -l lk -c "exe.dev user" ubuntu && \
 	getent passwd lk | grep -q ':/usr/bin/fish$' && \
 	getent passwd root | grep -q ':/usr/bin/fish$'
 
+# Bake /etc/fstab so systemd-growfs@-.service resizes the root filesystem on
+# first boot after the disk is grown.
+RUN echo '/dev/vda / ext4 defaults,x-systemd.growfs 0 1' > /etc/fstab
+
 ENV EXEUNTU=1
 ENV SHELL=/usr/bin/fish
 
@@ -293,13 +306,16 @@ RUN case "$(uname -m)" in \
         *) echo "Unsupported architecture: $(uname -m)" && exit 1 ;; \
     esac && \
     if [ -z "${PI_VERSION}" ]; then \
-        PI_URL="https://github.com/earendil-works/pi/releases/latest/download/pi-linux-${ARCH}.tar.gz"; \
-    else \
-        PI_URL="https://github.com/earendil-works/pi/releases/download/${PI_VERSION}/pi-linux-${ARCH}.tar.gz"; \
+        # Pi's updater follows the npm package. GitHub's latest release and
+        # latest/download URLs can lag behind, so resolve via npm and fetch the
+        # matching tagged GitHub asset. Revisit if upstream makes them agree.
+        PI_VERSION=$(curl -fsSL https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest | jq -r '.version'); \
     fi && \
-    mkdir -p /home/lk/.local/bin && \
-    curl -fsSL "${PI_URL}" | \
+    PI_TAG="v${PI_VERSION#v}" && \
+    curl -fsSL "https://github.com/earendil-works/pi/releases/download/${PI_TAG}/pi-linux-${ARCH}.tar.gz" | \
     tar xz -C /home/lk/.local/ && \
+    test "$(/home/lk/.local/pi/pi --version)" = "${PI_TAG#v}" && \
+    mkdir -p /home/lk/.local/bin && \
     ln -sf /home/lk/.local/pi/pi /home/lk/.local/bin/pi && \
     chown -R lk:lk /home/lk/.local/pi && \
     ln -sf /home/lk/.local/bin/pi /usr/local/bin/pi
