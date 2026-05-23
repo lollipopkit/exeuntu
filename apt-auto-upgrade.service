@@ -1,0 +1,11 @@
+[Unit]
+Description=Automatic system upgrade (apt)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/apt-get update
+ExecStart=/usr/bin/apt-get upgrade -y
+ExecStart=/usr/bin/apt-get autoremove -y
+ExecStart=/usr/bin/apt-get clean

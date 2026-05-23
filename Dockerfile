@@ -227,8 +227,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 # Install Homebrew on Linux for the default user.
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Configure git to use 'main' as default branch name
-RUN git config --global init.defaultBranch main
+# Configure git defaults
+RUN git config --global init.defaultBranch main \
+    && git config --global user.email "10864310+lollipopkit@users.noreply.github.com" \
+    && git config --global user.name "lollipopkit"
 
 # Switch back to root to install systemd services
 USER root
@@ -249,6 +251,12 @@ COPY exe-setup.service /etc/systemd/system/exe-setup.service
 RUN chmod 644 /etc/systemd/system/exe-setup.service && \
     systemctl enable exe-setup.service
 
+# Daily automatic system upgrade via systemd timer
+COPY apt-auto-upgrade.service /etc/systemd/system/apt-auto-upgrade.service
+COPY apt-auto-upgrade.timer /etc/systemd/system/apt-auto-upgrade.timer
+RUN chmod 644 /etc/systemd/system/apt-auto-upgrade.service /etc/systemd/system/apt-auto-upgrade.timer && \
+    systemctl enable apt-auto-upgrade.timer
+
 # TODO(crawshaw/philip): This is called init so that exetini decides
 # this wrapper script is an init, and exec's it rather than forking it.
 # It would be better if you could indicate that via an env variable or something.
@@ -268,28 +276,14 @@ RUN ARCH=$(uname -m) && \
     chmod +x /usr/local/bin/codex
 
 # Create config directories for LLM agents
-RUN mkdir -p /home/lk/.claude /home/lk/.codex /home/lk/.pi && \
-    chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi
+RUN mkdir -p /home/lk/.codex /home/lk/.pi && \
+    chown -R lk:lk /home/lk/.codex /home/lk/.pi
 
-# Copy LLM agent instructions to Claude, Codex, and Pi config directories
+# Copy LLM agent instructions to Codex and Pi config directories
 COPY AGENTS.md /home/lk/.codex/AGENTS.md
 COPY --chown=lk:lk codex-config.toml /home/lk/.codex/config.toml
-RUN cp /home/lk/.codex/AGENTS.md /home/lk/.claude/CLAUDE.md && \
-    cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
-    chown -R lk:lk /home/lk/.claude /home/lk/.codex /home/lk/.pi
-
-# Install Claude to the native location (~/.local/bin) so auto-upgrades work correctly.
-# Symlink to /usr/local/bin for system-wide PATH access.
-RUN mkdir -p /home/lk/.local/bin && \
-    ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') && \
-    PLATFORM="linux-${ARCH}" && \
-    STABLE_VERSION=$(curl -fsSL https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/stable) && \
-    EXPECTED_HASH=$(curl -fsSL "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${STABLE_VERSION}/manifest.json" | jq -r ".platforms[\"${PLATFORM}\"].checksum") && \
-    curl -fsSL "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${STABLE_VERSION}/${PLATFORM}/claude" -o /home/lk/.local/bin/claude && \
-    echo "${EXPECTED_HASH}  /home/lk/.local/bin/claude" | sha256sum -c - && \
-    chmod +x /home/lk/.local/bin/claude && \
-    chown -R lk:lk /home/lk/.local && \
-    ln -s /home/lk/.local/bin/claude /usr/local/bin/claude
+RUN cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
+    chown -R lk:lk /home/lk/.codex /home/lk/.pi
 
 # Install pi (pi-coding-agent) standalone binary
 ARG PI_VERSION=
