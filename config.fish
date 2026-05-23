@@ -14,7 +14,8 @@ end
 # Change to /opt/homebrew/bin/fish if using Homebrew Fish
 set -x SHELL /usr/bin/fish
 set -x TZ Asia/Shanghai
-set -x LC_ALL en_US.UTF-8
+set -x LANG C.UTF-8
+set -x LC_ALL C.UTF-8
 set -x EDITOR vim
 set -x FIC $HOME/.config/fish/config.fish
 set -x FIH $HOME/.local/share/fish/fish_history
