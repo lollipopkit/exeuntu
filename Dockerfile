@@ -287,15 +287,22 @@ RUN cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
 
 # Install pi (pi-coding-agent) standalone binary
 ARG PI_VERSION=
-RUN ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') && \
+RUN case "$(uname -m)" in \
+        x86_64) ARCH="x64" ;; \
+        aarch64|arm64) ARCH="arm64" ;; \
+        *) echo "Unsupported architecture: $(uname -m)" && exit 1 ;; \
+    esac && \
     if [ -z "${PI_VERSION}" ]; then \
-        PI_VERSION=$(curl -fsSL https://api.github.com/repos/badlogic/pi-mono/releases/latest | jq -r '.tag_name'); \
+        PI_URL="https://github.com/earendil-works/pi/releases/latest/download/pi-linux-${ARCH}.tar.gz"; \
+    else \
+        PI_URL="https://github.com/earendil-works/pi/releases/download/${PI_VERSION}/pi-linux-${ARCH}.tar.gz"; \
     fi && \
-    curl -fsSL "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}/pi-linux-${ARCH}.tar.gz" | \
+    mkdir -p /home/lk/.local/bin && \
+    curl -fsSL "${PI_URL}" | \
     tar xz -C /home/lk/.local/ && \
-    ln -s /home/lk/.local/pi/pi /home/lk/.local/bin/pi && \
+    ln -sf /home/lk/.local/pi/pi /home/lk/.local/bin/pi && \
     chown -R lk:lk /home/lk/.local/pi && \
-    ln -s /home/lk/.local/bin/pi /usr/local/bin/pi
+    ln -sf /home/lk/.local/bin/pi /usr/local/bin/pi
 
 # Install pi exe.dev extension (LLM gateway + environment context).
 # Pre-fetch catalog.json so the first request Just Works immediately.
