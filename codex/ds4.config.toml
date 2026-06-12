@@ -1,0 +1,2 @@
+model_provider = "cliproxyapi"
+model = "deepseek-v4-pro"

@@ -3,28 +3,1187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>__HOSTNAME__</title>
+    <title>__HOSTNAME__ | Exeuntu</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            --bg: #080a0f;
+            --surface: #121620;
+            --surface-hover: #181d2a;
+            --surface-glass: rgba(18, 22, 32, 0.7);
+            --border: rgba(255, 255, 255, 0.05);
+            --border-hover: rgba(99, 102, 241, 0.35);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            
+            --cyan: #06b6d4;
+            --cyan-glow: rgba(6, 182, 212, 0.15);
+            
+            --emerald: #10b981;
+            --orange: #f97316;
+            
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0a0a0a;
-            color: #e0e0e0;
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-primary);
             min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient Background Glows */
+        .ambient-glows {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-circle {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.45;
+        }
+
+        .glow-1 {
+            top: -10%;
+            left: 20%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+        }
+
+        .glow-2 {
+            top: 30%;
+            right: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--cyan-glow) 0%, transparent 70%);
+        }
+
+        .glow-3 {
+            bottom: -10%;
+            left: -10%;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(249, 115, 22, 0.05) 0%, transparent 70%);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080a0f;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.10);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.20);
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.25rem;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--orange) 0%, var(--primary) 100%);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
         }
-        .container { text-align: center; }
-        h1 { font-size: 3rem; font-weight: 300; margin: 0.5rem 0; }
-        p { color: #888; margin: 0.5rem 0; }
+
+        .brand-logo svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+
+        .brand-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-tag {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            padding: 0.4rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--emerald);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--emerald);
+            animation: status-pulse 2s infinite;
+        }
+
+        @keyframes status-pulse {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -0.04em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .hero p.desc {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 620px;
+            margin: 0 auto 2rem auto;
+        }
+
+        /* Copy Action Card */
+        .connection-wrapper {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .connection-card {
+            background: var(--surface-glass);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 0.65rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.85rem;
+            max-width: 100%;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.3s;
+        }
+
+        .connection-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .conn-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-right: 1px solid var(--border);
+            padding-right: 0.75rem;
+        }
+
+        .conn-command {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--cyan);
+            white-space: nowrap;
+            overflow-x: auto;
+            max-width: 300px;
+            scrollbar-width: none;
+        }
+        .conn-command::-webkit-scrollbar {
+            display: none;
+        }
+
+        .conn-copy {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.4rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .conn-copy:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .conn-copy svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .image-badge-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .image-badge-container:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .image-badge {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .image-badge-container:hover .image-badge {
+            color: var(--text-secondary);
+        }
+
+        /* Dashboard Grid */
+        .dash-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.3fr;
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        @media (max-width: 968px) {
+            .dash-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--surface-glass);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .panel-title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--primary);
+        }
+
+        /* Specs List */
+        .specs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .spec-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .spec-name {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .spec-value {
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge-systemd {
+            background: rgba(99, 102, 241, 0.1);
+            color: #a5b4fc;
+            padding: 0.15rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .badge-shell {
+            background: rgba(6, 182, 212, 0.1);
+            color: #22d3ee;
+            padding: 0.15rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            font-family: var(--font-mono);
+        }
+
+        /* Tools Panel CSS adjustments */
+
+        .search-box-container {
+            position: relative;
+            width: 300px;
+            max-width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.65rem 1rem 0.65rem 2.5rem;
+            color: white;
+            font-size: 0.9rem;
+            font-family: var(--font-sans);
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .search-box-container svg {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--text-muted);
+        }
+
+        .tags-wrapper {
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-tag {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.9rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-tag:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: white;
+        }
+
+        .filter-tag.active {
+            background: rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.3);
+            color: #22d3ee;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.05);
+        }
+
+        .grid-tools {
+            display: flex;
+            gap: 1.25rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-top: 0.5rem;
+            padding-bottom: 0.75rem;
+            margin-top: -0.25rem;
+            width: 100%;
+        }
+
+        .tool-card {
+            background: var(--surface-glass);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+            flex: 0 0 calc(50% - 0.625rem);
+            max-width: 280px;
+        }
+
+        @media (max-width: 640px) {
+            .grid-tools {
+                gap: 0.75rem;
+            }
+            .tool-card {
+                flex: 0 0 calc(100% - 0.75rem);
+                max-width: none;
+            }
+        }
+
+        .tool-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--border-hover);
+            box-shadow: 0 15px 30px -10px rgba(99, 102, 241, 0.15);
+        }
+
+        .tool-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tool-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .tool-card:hover .tool-icon {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.25);
+            color: #a5b4fc;
+        }
+
+        .tool-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .tool-cat-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        .tool-card:hover .tool-cat-badge {
+            color: var(--text-secondary);
+        }
+
+        .tool-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .tool-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            flex-grow: 1;
+        }
+
+        .tool-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid rgba(255,255,255,0.03);
+            padding-top: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .tool-cmd-hint {
+            font-family: var(--font-mono);
+            color: var(--cyan);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #10b981;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 4rem 0 2rem 0;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .footer-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .footer-text a {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .footer-text a:hover {
+            color: var(--primary);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .footer-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: white;
+        }
+
+        .footer-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 640px) {
+            .hero h1 {
+                font-size: 2.25rem;
+            }
+            .hero p.desc {
+                font-size: 1rem;
+            }
+            .conn-command {
+                max-width: 180px;
+            }
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            header {
+                margin-bottom: 2.5rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <p>served with nginx</p>
-        <h1>__HOSTNAME__</h1>
-        <p>hosted with love on exe.dev</p>
+
+    <!-- Background glowing graphics -->
+    <div class="ambient-glows">
+        <div class="glow-circle glow-1"></div>
+        <div class="glow-circle glow-2"></div>
+        <div class="glow-circle glow-3"></div>
     </div>
+
+    <div class="container">
+        
+        <!-- Header -->
+        <header>
+            <a href="https://exe.dev" class="brand" target="_blank" rel="noopener">
+                <div class="brand-logo">
+                    <!-- Terminal Icon Inside Logo -->
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                </div>
+                <div class="brand-info">
+                    <span class="brand-name">exeuntu</span>
+                    <span class="brand-tag">exe.dev developer environment</span>
+                </div>
+            </a>
+            <div class="status">
+                <div class="status-dot"></div>
+                <span>Active</span>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <main>
+            <section class="hero" style="margin-bottom: 2.5rem;">
+                <h1>__HOSTNAME__</h1>
+                <p class="desc" style="margin-bottom: 0;">Your kitted-out development environment based on Ubuntu 24.04 and powered by systemd.</p>
+            </section>
+
+            <!-- Dashboard Info & Interactive Terminal -->
+            <section class="dash-grid">
+                
+                <!-- Specs Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <!-- Info Icon -->
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            Container Specs
+                        </h3>
+                    </div>
+                    
+                    <div class="specs-list">
+                        <div class="spec-item">
+                            <span class="spec-name">Operating System</span>
+                            <span class="spec-value">Ubuntu 24.04 LTS</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-name">Init Daemon</span>
+                            <span class="spec-value"><span class="badge-systemd">systemd</span></span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-name">Primary User</span>
+                            <span class="spec-value">lk <span style="font-size:0.75rem; color:var(--text-muted);">(Passwordless sudo)</span></span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-name">Default Shell</span>
+                            <span class="spec-value"><span class="badge-shell">fish shell</span></span>
+                        </div>
+                        <div class="spec-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+                            <span class="spec-name">SSH Access</span>
+                            <span class="spec-value" style="display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: space-between;">
+                                <code style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--cyan); background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 0.25rem 0.5rem; border-radius: 6px; overflow-x: auto; max-width: calc(100% - 32px); scrollbar-width: none;">ssh lk@__HOSTNAME__</code>
+                                <button class="conn-copy" data-copy-text="ssh lk@__HOSTNAME__" title="Copy SSH command" style="padding: 0.35rem; flex-shrink: 0;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="spec-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+                            <span class="spec-name">Docker Image</span>
+                            <span class="spec-value" style="display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: space-between;">
+                                <code style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 0.25rem 0.5rem; border-radius: 6px; overflow-x: auto; max-width: calc(100% - 32px); scrollbar-width: none;">ghcr.io/lollipopkit/exeuntu:latest</code>
+                                <button class="conn-copy" data-copy-text="ghcr.io/lollipopkit/exeuntu:latest" title="Copy Image Tag" style="padding: 0.35rem; flex-shrink: 0;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pre-installed Toolkit Panel -->
+                <div class="panel" style="gap: 1.25rem; max-width: 600px; width: 100%;">
+                    <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; width: 100%;">
+                        <h3 class="panel-title">
+                            <!-- Tools Icon -->
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                            Pre-installed Toolkit
+                        </h3>
+                    </div>
+
+                    <div class="search-box-container" style="width: 100%;">
+                        <!-- Search Icon -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" class="search-input" id="tool-search" placeholder="Search tools (e.g. uv, git, btop)...">
+                    </div>
+
+                    <!-- Category Filters -->
+                    <div class="filter-tags" style="width: 100%;">
+                        <button class="filter-tag active" data-filter="all">All</button>
+                        <button class="filter-tag" data-filter="core">Core</button>
+                        <button class="filter-tag" data-filter="languages">Lang</button>
+                        <button class="filter-tag" data-filter="package-managers">Pkgs</button>
+                        <button class="filter-tag" data-filter="cli">CLI</button>
+                    </div>
+
+                    <!-- Tools Grid -->
+                    <div class="grid-tools" id="tools-grid">
+                        
+                        <!-- Card 1: Ubuntu -->
+                        <div class="tool-card" data-category="core" data-tags="ubuntu system shell lts noble noble numbat linux os">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#E95420"/><circle cx="12" cy="12" r="6" fill="#fff"/><circle cx="12" cy="12" r="4" fill="#E95420"/><path d="M12 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 16a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-8-8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" fill="#fff"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Core OS</span>
+                            </div>
+                            <div class="tool-name">Ubuntu 24.04 LTS</div>
+                            <div class="tool-desc">Full-featured Ubuntu base image, not minimized. Documentation is intact.</div>
+                            <div class="tool-info">
+                                <span>Noble Numbat</span>
+                                <span class="tool-cmd-hint">/etc/os-release</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: systemd -->
+                        <div class="tool-card" data-category="core" data-tags="systemd init daemon service systemctl boot pid1 journalctl">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Init</span>
+                            </div>
+                            <div class="tool-name">systemd</div>
+                            <div class="tool-desc">Complete service management and logging. PID 1 enabled.</div>
+                            <div class="tool-info">
+                                <span>Active</span>
+                                <span class="tool-cmd-hint">systemctl</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Docker -->
+                        <div class="tool-card" data-category="core" data-tags="docker container compose buildx nested daemon virtualization">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.9 11.2h2.2v2.2h-2.2zm-2.7 0h2.2v2.2h-2.2zm-2.7 0h2.2v2.2H8.5zm5.4-2.7h2.2V10.7h-2.2zm-2.7 0h2.2V10.7h-2.2zm-2.7 0h2.2V10.7H5.8zm2.7-2.7h2.2V5.8H8.5zm2.7 0h2.2V5.8h-2.2zM2 13c0 3.3 2.7 6 6 6h8c3.3 0 6-2.7 6-6v-1c-1 .6-2.3 1-3.6 1-.3 0-.6 0-.8-.1-1.1-.1-2.2-.6-3.2-1.3l-.4-.3-.4.3c-1.4.9-3.2 1.4-5 1.2-2.1-.2-3.8-1.5-4.6-3.5H2v1.7z"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Containers</span>
+                            </div>
+                            <div class="tool-name">Docker / Compose</div>
+                            <div class="tool-desc">Docker engine, Buildx, and Compose pre-configured for nesting.</div>
+                            <div class="tool-info">
+                                <span>Docker v2</span>
+                                <span class="tool-cmd-hint">docker info</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Tailscale -->
+                        <div class="tool-card" data-category="core" data-tags="tailscale vpn wireguard network mesh secure peer">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="18" cy="12" r="3"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Networking</span>
+                            </div>
+                            <div class="tool-name">Tailscale</div>
+                            <div class="tool-desc">Zero-config secure mesh VPN to connect to private networks.</div>
+                            <div class="tool-info">
+                                <span>VPN Daemon</span>
+                                <span class="tool-cmd-hint">tailscale status</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 5: Go -->
+                        <div class="tool-card" data-category="languages" data-tags="go golang compiler development backend languages code">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <span style="font-family: var(--font-mono); font-weight: bold; font-size: 0.9rem;">Go</span>
+                                </div>
+                                <span class="tool-cat-badge">Language</span>
+                            </div>
+                            <div class="tool-name">Go (Golang)</div>
+                            <div class="tool-desc">Latest stable Go installation from source with formatters.</div>
+                            <div class="tool-info">
+                                <span>Stable release</span>
+                                <span class="tool-cmd-hint">go version</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 6: Python -->
+                        <div class="tool-card" data-category="languages" data-tags="python py pip virtualenv interpreter scripts backend runtime">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm-1 9V9l3 3-3 3z"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Language</span>
+                            </div>
+                            <div class="tool-name">Python 3</div>
+                            <div class="tool-desc">Standard Python 3 environment pre-aliased, including setup tools.</div>
+                            <div class="tool-info">
+                                <span>Python 3.12+</span>
+                                <span class="tool-cmd-hint">python --version</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 7: uv -->
+                        <div class="tool-card" data-category="package-managers" data-tags="uv astral python pip package installer fast rust packages">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <span style="font-family: var(--font-mono); font-weight: bold; font-size: 0.9rem; color: #a5b4fc;">uv</span>
+                                </div>
+                                <span class="tool-cat-badge">Pkg Manager</span>
+                            </div>
+                            <div class="tool-name">uv (by Astral)</div>
+                            <div class="tool-desc">Extremely fast Python package installer and resolver in Rust.</div>
+                            <div class="tool-info">
+                                <span>Rust-powered</span>
+                                <span class="tool-cmd-hint">uv pip install</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 8: pipx -->
+                        <div class="tool-card" data-category="package-managers" data-tags="pipx python cli run execute apps packages tool isolated">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <span style="font-family: var(--font-mono); font-weight: bold; font-size: 0.8rem;">pipx</span>
+                                </div>
+                                <span class="tool-cat-badge">Pkg Manager</span>
+                            </div>
+                            <div class="tool-name">pipx</div>
+                            <div class="tool-desc">Install and run Python terminal applications in isolated envs.</div>
+                            <div class="tool-info">
+                                <span>Isolated CLIs</span>
+                                <span class="tool-cmd-hint">pipx install</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 9: Fish Shell -->
+                        <div class="tool-card" data-category="cli" data-tags="fish shell bash prompt auto-suggestions completions terminal cli commands">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Shell</span>
+                            </div>
+                            <div class="tool-name">Fish Shell</div>
+                            <div class="tool-desc">Default shell with smart autocomplete suggestions and themes.</div>
+                            <div class="tool-info">
+                                <span>Default shell</span>
+                                <span class="tool-cmd-hint">echo $SHELL</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 10: Neovim / Vim -->
+                        <div class="tool-card" data-category="cli" data-tags="neovim nvim vim editor text config code terminal text editor text edit">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Editors</span>
+                            </div>
+                            <div class="tool-name">Neovim & Vim</div>
+                            <div class="tool-desc">Vi-improved terminal text editors pre-installed for configuration.</div>
+                            <div class="tool-info">
+                                <span>Vi-improved</span>
+                                <span class="tool-cmd-hint">nvim</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 11: Git & GitHub CLI -->
+                        <div class="tool-card" data-category="cli" data-tags="git gh github version control commit push pull repo command line">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 15V9a4 4 0 0 0-4-4H9M6 9v6"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Dev Tools</span>
+                            </div>
+                            <div class="tool-name">Git & GitHub CLI</div>
+                            <div class="tool-desc">Source control tools and the official GitHub CLI tool `gh`.</div>
+                            <div class="tool-info">
+                                <span>VCS Toolkit</span>
+                                <span class="tool-cmd-hint">git status</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 12: System Monitors -->
+                        <div class="tool-card" data-category="cli" data-tags="btop atop btop++ iotop diagnostics cpu memory ram process monitoring performance status">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Diagnostics</span>
+                            </div>
+                            <div class="tool-name">btop & atop</div>
+                            <div class="tool-desc">Modern visual resource monitors showing dynamic CPU/RAM utilization.</div>
+                            <div class="tool-info">
+                                <span>Visual Resource</span>
+                                <span class="tool-cmd-hint">btop</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 13: ripgrep & jq -->
+                        <div class="tool-card" data-category="cli" data-tags="ripgrep rg jq json grep text search regex parser utility filter query data">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Utilities</span>
+                            </div>
+                            <div class="tool-name">ripgrep & jq</div>
+                            <div class="tool-desc">Search files rapidly using regex and parse JSON data in shell.</div>
+                            <div class="tool-info">
+                                <span>Speedy Helpers</span>
+                                <span class="tool-cmd-hint">rg --version</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 14: sqlite3 -->
+                        <div class="tool-card" data-category="cli" data-tags="sqlite sqlite3 database sql relational file data query schema local">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Database</span>
+                            </div>
+                            <div class="tool-name">SQLite 3</div>
+                            <div class="tool-desc">Self-contained, serverless relational database engine pre-installed.</div>
+                            <div class="tool-info">
+                                <span>Local DB</span>
+                                <span class="tool-cmd-hint">sqlite3 --version</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 15: headless-shell -->
+                        <div class="tool-card" data-category="cli" data-tags="headless-shell chrome chromium browser chromedp testing web scraper automation web test scrap">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Browsers</span>
+                            </div>
+                            <div class="tool-name">Headless Chrome</div>
+                            <div class="tool-desc">Chromedp headless-shell for browser testing and automation.</div>
+                            <div class="tool-info">
+                                <span>Testing Shell</span>
+                                <span class="tool-cmd-hint">headless-shell</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 16: mitmproxy -->
+                        <div class="tool-card" data-category="cli" data-tags="mitmproxy proxy network intercept traffic debugging tool ssl tls request capture filter">
+                            <div class="tool-card-header">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                </div>
+                                <span class="tool-cat-badge">Network Proxy</span>
+                            </div>
+                            <div class="tool-name">mitmproxy</div>
+                            <div class="tool-desc">SSL/TLS intercepting HTTP proxy for network traffic capture.</div>
+                            <div class="tool-info">
+                                <span>Traffic Intercept</span>
+                                <span class="tool-cmd-hint">mitmproxy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-text">
+                Hosted with love on <a href="https://exe.dev" target="_blank" rel="noopener">exe.dev</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Copied feedback toast -->
+    <div class="toast" id="toast">
+        <!-- Checkmark SVG -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span class="toast-msg">Copied to clipboard!</span>
+    </div>
+
+    <script>
+
+
+        // Copy to Clipboard functions
+        const toast = document.getElementById('toast');
+        let toastTimeout;
+
+        function showToast(message) {
+            toast.querySelector('.toast-msg').textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        function copyText(text, successMsg) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(successMsg || "Copied to clipboard!");
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+
+
+        document.querySelectorAll('.conn-copy').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const cmd = btn.dataset.copyText;
+                copyText(cmd, "Command copied!");
+            });
+        });
+
+        // Search and filter tools
+        const searchInput = document.getElementById('tool-search');
+        const filterTags = document.querySelectorAll('.filter-tag');
+        const toolCards = document.querySelectorAll('.tool-card');
+        let activeFilter = 'all';
+
+        function filterTools() {
+            const query = searchInput.value.toLowerCase().trim();
+            
+            toolCards.forEach(card => {
+                const matchesCategory = activeFilter === 'all' || card.dataset.category === activeFilter;
+                
+                const cardName = card.querySelector('.tool-name').textContent.toLowerCase();
+                const cardDesc = card.querySelector('.tool-desc').textContent.toLowerCase();
+                const cardTags = card.dataset.tags ? card.dataset.tags.toLowerCase() : '';
+                const matchesSearch = !query || 
+                                     cardName.includes(query) || 
+                                     cardDesc.includes(query) || 
+                                     cardTags.includes(query);
+                
+                if (matchesCategory && matchesSearch) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        searchInput.addEventListener('input', filterTools);
+
+        filterTags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                filterTags.forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                activeFilter = tag.dataset.filter;
+                filterTools();
+            });
+        });
+
+        // Quick key events
+        document.addEventListener('keydown', (e) => {
+            // focus search with '/'
+            if (e.key === '/' && document.activeElement !== searchInput) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+
+
+    </script>
 </body>
 </html>

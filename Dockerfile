@@ -275,8 +275,10 @@ RUN mkdir -p /home/lk/.codex /home/lk/.pi && \
 
 # Copy LLM agent instructions to Codex and Pi config directories
 COPY AGENTS.md /home/lk/.codex/AGENTS.md
-COPY --chown=lk:lk codex-config.toml /home/lk/.codex/config.toml
-COPY --chown=lk:lk g5.config.toml /home/lk/.codex/g5.config.toml
+COPY --chown=lk:lk codex/config.toml /home/lk/.codex/config.toml
+COPY --chown=lk:lk codex/g5.config.toml /home/lk/.codex/g5.config.toml
+COPY --chown=lk:lk codex/ds4.config.toml /home/lk/.codex/ds4.config.toml
+COPY --chown=lk:lk codex/glm.config.toml /home/lk/.codex/glm.config.toml
 RUN cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
     curl -fsSL https://gist.githubusercontent.com/lollipopkit/be548c17c04dac0fde78a282e1aec88d/raw/9f01f8ad4c26dc982116265e2f2970ef7bb605e3/sync-codex-catalogs.py \
         -o /usr/local/bin/sync-codex-catalogs && \

@@ -1,3 +1,2 @@
-[profiles.g5]
 model_provider = "cliproxyapi"
 model = "gpt-5.5"
