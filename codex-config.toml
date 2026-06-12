@@ -1,9 +1,8 @@
 model = "gpt-5.5"
 model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "xhigh"
 
 web_search = "live"
-# developer_instructions = """输出必须使用中文,专业名词可保留原文;"""
 hide_agent_reasoning = true
 
 # approval_policy = "untrusted"
@@ -36,17 +35,6 @@ name = "cliproxyapi"
 base_url = "http://100.103.213.81:8317/v1"
 wire_api = "responses"
 env_key = "PIMM_API_KEY"
-
-[profiles.g5]
-model_provider = "cliproxyapi"
-model = "gpt-5.5"
-
-[profiles.g5cs]
-model_provider = "cliproxyapi"
-model = "gpt-5.3-codex-spark"
-
-[profiles.g5cs.features]
-image_generation = false
 
 [notice]
 hide_gpt5_1_migration_prompt = true

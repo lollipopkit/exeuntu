@@ -96,7 +96,6 @@ RUN rm /etc/systemd/system/multi-user.target.wants/console-setup.service \
 		dm-event.socket \
 		man-db.timer \
 		update-notifier-download.timer \
-		update-notifier-motd.timer \
 		atop-rotate.timer \
 		dpkg-db-backup.timer \
 		e2scrub_all.timer \
@@ -149,7 +148,6 @@ RUN rm /etc/systemd/system/multi-user.target.wants/console-setup.service \
 		   atop.service \
                    getty@.service \
                    snapd.socket \
-		   motd-news.timer motd-news.service \
 		    apport.service apport-autoreport.timer apport-autoreport.path apport-forward.socket \
 		    snapd.snap-repair.timer snapd.snap-repair.service \
 		    udisks2.service \
@@ -251,17 +249,6 @@ RUN git config --global init.defaultBranch main \
 # Switch back to root to install systemd services
 USER root
 
-# Disable Ubuntu's default MOTD (the sudo hint, etc.)
-RUN rm -rf /etc/update-motd.d/* /etc/motd && touch /home/lk/.hushlogin && chown lk:lk /home/lk/.hushlogin
-
-# Add custom MOTD to lk's .bashrc (ignores .hushlogin - we handle that ourselves)
-COPY motd-snippet.bash /tmp/motd-snippet.bash
-RUN cat /tmp/motd-snippet.bash >> /home/lk/.bashrc && rm /tmp/motd-snippet.bash
-COPY motd-snippet.fish /tmp/motd-snippet.fish
-RUN cat /tmp/motd-snippet.fish >> /home/lk/.config/fish/config.fish && \
-    rm /tmp/motd-snippet.fish && \
-    chown -R lk:lk /home/lk/.config/fish
-
 # Create systemd oneshot service for /exe.dev/setup script
 COPY exe-setup.service /etc/systemd/system/exe-setup.service
 RUN chmod 644 /etc/systemd/system/exe-setup.service && \
@@ -279,17 +266,8 @@ RUN chmod 644 /etc/systemd/system/apt-auto-upgrade.service /etc/systemd/system/a
 COPY init-wrapper.sh /usr/local/bin/init
 
 # Install native codex; installs to /usr/local/bin
-RUN ARCH=$(uname -m) && \
-    case ${ARCH} in \
-        x86_64) CODEX_ARCH="x86_64-unknown-linux-musl" ;; \
-        aarch64|arm64) CODEX_ARCH="aarch64-unknown-linux-musl" ;; \
-        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-    esac && \
-    CODEX_VERSION=$(curl -fsSL https://api.github.com/repos/openai/codex/releases/latest | jq -r '.tag_name') && \
-    curl -fsSL "https://github.com/openai/codex/releases/download/${CODEX_VERSION}/codex-${CODEX_ARCH}.tar.gz" | \
-    tar -xzC /usr/local/bin && \
-    mv "/usr/local/bin/codex-${CODEX_ARCH}" /usr/local/bin/codex && \
-    chmod +x /usr/local/bin/codex
+RUN curl -fsSL https://chatgpt.com/codex/install.sh | \
+    CODEX_HOME=/usr/local/lib/codex CODEX_INSTALL_DIR=/usr/local/bin CODEX_NON_INTERACTIVE=1 sh
 
 # Create config directories for LLM agents
 RUN mkdir -p /home/lk/.codex /home/lk/.pi && \
@@ -298,7 +276,12 @@ RUN mkdir -p /home/lk/.codex /home/lk/.pi && \
 # Copy LLM agent instructions to Codex and Pi config directories
 COPY AGENTS.md /home/lk/.codex/AGENTS.md
 COPY --chown=lk:lk codex-config.toml /home/lk/.codex/config.toml
+COPY --chown=lk:lk g5.config.toml /home/lk/.codex/g5.config.toml
 RUN cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
+    curl -fsSL https://gist.githubusercontent.com/lollipopkit/be548c17c04dac0fde78a282e1aec88d/raw/9f01f8ad4c26dc982116265e2f2970ef7bb605e3/sync-codex-catalogs.py \
+        -o /usr/local/bin/sync-codex-catalogs && \
+    chmod +x /usr/local/bin/sync-codex-catalogs && \
+    /usr/local/bin/sync-codex-catalogs --out /home/lk/.codex/model-catalogs/ormc-models.json --force && \
     chown -R lk:lk /home/lk/.codex /home/lk/.pi
 
 # Install pi (pi-coding-agent) standalone binary
