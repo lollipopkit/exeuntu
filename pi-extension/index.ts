@@ -3,18 +3,46 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
   type ProviderConfig,
-  type ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
 import { findEnvKeys } from "@mariozechner/pi-ai";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  configFromCatalogProvider,
+  discoverIntegrationCatalogs,
+  fetchJSONWithTimeout,
+  integrationPromptAvailabilityLabel,
+  integrationProviderDisplayName,
+  providerInfo,
+  providerInfosFromIntegrationCatalogs,
+  validCatalog,
+  type Catalog,
+  type GatewayProviderInfo,
+} from "./integration_catalog.ts";
+import { chooseDefaultModel, modelChoiceLabel } from "./model_choice.ts";
+import {
+  nativeModelIDForGeneratedModel,
+  rewriteIntegrationProviderPayload,
+} from "./request_rewrite.ts";
+import {
+  llmIntegrationPromptDecision,
+  readLLMIntegrationPreference,
+  writeLLMIntegrationPreference,
+  type LLMIntegrationPreference,
+} from "./routing_preference.ts";
 
-// LLM gateway base, reachable inside every exe.dev VM. The metadata server
+// LLM integration discovery and gateway fallback endpoints, reachable inside
+// every exe.dev VM. The metadata server
 // rewrites /gateway/llm/X to /_/gateway/X (exelet/metadata/metadata.go) and
 // forwards to the gateway, which serves the catalog at /_/gateway/models.json
 // before the credit check (llmgateway/gateway.go).
+const REFLECTION_INTEGRATIONS_URLS = [
+  "https://reflection.int.exe.xyz/integrations",
+  "https://reflection.int.exe.cloud/integrations",
+  "http://reflection.int.exe.cloud/integrations",
+];
 const GATEWAY = "http://169.254.169.254/gateway/llm";
 const CATALOG_URL = `${GATEWAY}/models.json`;
 
@@ -37,13 +65,7 @@ const NOTIFY_STATE_FILE = join(CACHE_DIR, "last-routing.json");
 // stays in sync.
 const AUTH_FILE = join(getAgentDir(), "auth.json");
 const MODELS_FILE = join(getAgentDir(), "models.json");
-
-type GatewayProviderInfo = {
-  config: ProviderConfig;
-  // Model ids the gateway accepts for this provider. Unknown when falling back
-  // to pi's built-in catalog, so custom models are treated conservatively.
-  modelIds?: ReadonlySet<string>;
-};
+const LLM_INTEGRATION_PREFERENCE_FILE = join(getAgentDir(), "exe-dev-llm-integration.json");
 
 function readJSONFile(path: string): unknown | undefined {
   if (!existsSync(path)) return undefined;
@@ -143,99 +165,10 @@ function loadUserConfiguredProviders(
   return out;
 }
 
-// Keep in lockstep with llmpricing.CatalogSchemaVersion. Any breaking change
-// there requires shipping a new exe-dev pi extension that knows the new shape;
-// until then the extension treats the catalog as unavailable and falls back.
-const SCHEMA_VERSION = 1;
-
 // In-VM fetches go to a link-local address with no DNS, so anything beyond a
 // short budget is almost certainly stuck. The fetch is non-blocking (it only
 // updates the on-disk cache for the next launch), so a tight timeout is fine.
 const FETCH_TIMEOUT_MS = 1500;
-
-// Allowlists for fields we forward into pi-ai. Forwarding an unknown value
-// would silently misconfigure the model, so we drop it and let pi-ai keep its
-// auto-detected default. Keep these in sync with @mariozechner/pi-ai's types.
-// pi-ai's Api type is `KnownApi | (string & {})`, which permits any string
-// for forward compatibility. We don't get static checking for this list, so
-// keep it in sync with pi-ai's KnownApi by hand.
-const KNOWN_APIS: ReadonlySet<string> = new Set([
-  "openai-completions",
-  "openai-responses",
-  "openai-codex-responses",
-  "azure-openai-responses",
-  "anthropic-messages",
-  "bedrock-converse-stream",
-  "google-generative-ai",
-  "google-vertex",
-  "mistral-conversations",
-]);
-const KNOWN_THINKING_FORMATS: ReadonlySet<string> = new Set([
-  "openai",
-  "openrouter",
-  "deepseek",
-  "zai",
-  "qwen",
-  "qwen-chat-template",
-]);
-const KNOWN_MAX_TOKENS_FIELDS: ReadonlySet<string> = new Set(["max_tokens", "max_completion_tokens"]);
-const KNOWN_CACHE_CONTROL_FORMATS: ReadonlySet<string> = new Set(["anthropic"]);
-
-// pi-ai's Model.compat is a discriminated union keyed on the model's Api
-// type, so generic reads/writes are not type-safe. We build a structural bag
-// of fields we know about and cast at the boundary when assigning to
-// ProviderModelConfig.compat. The cast is sound as long as the field types
-// here remain a subset of pi-ai's compat shapes.
-type CompatBag = {
-  supportsDeveloperRole?: boolean;
-  supportsReasoningEffort?: boolean;
-  maxTokensField?: "max_tokens" | "max_completion_tokens";
-  thinkingFormat?: "openai" | "openrouter" | "deepseek" | "zai" | "qwen" | "qwen-chat-template";
-  cacheControlFormat?: "anthropic";
-};
-
-interface CatalogCompat {
-  supportsDeveloperRole?: boolean;
-  maxTokensField?: string;
-  supportsReasoningEffort?: boolean;
-  thinkingFormat?: string;
-  cacheControlFormat?: string;
-}
-
-interface CatalogModel {
-  id: string;
-  name?: string;
-  type?: string;
-  reasoning?: boolean;
-  input?: ("text" | "image")[];
-  contextWindow?: number;
-  maxTokens?: number;
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
-  compat?: CatalogCompat;
-}
-
-interface CatalogProvider {
-  id: string;
-  path: string;
-  api?: string;
-  models: CatalogModel[];
-}
-
-interface Catalog {
-  schemaVersion: number;
-  providers: CatalogProvider[];
-}
-
-// validCatalog is a structural check that rejects shapes we cannot safely
-// register from. It deliberately does not validate every field; per-provider
-// and per-model errors are caught later in the registration loop.
-function validCatalog(cat: unknown): cat is Catalog {
-  if (!cat || typeof cat !== "object") return false;
-  const c = cat as Catalog;
-  if (c.schemaVersion !== SCHEMA_VERSION) return false;
-  if (!Array.isArray(c.providers) || c.providers.length === 0) return false;
-  return true;
-}
 
 // loadCatalogSync returns the freshest usable catalog, or null if none. The
 // on-disk cache wins over the bundled fallback so users pick up updates
@@ -316,103 +249,6 @@ async function refreshCatalogAsync(): Promise<void> {
   }
 }
 
-// sanitizeCompat copies only fields whose values pi-ai understands. Unknown
-// values would misconfigure the model silently; dropping them lets pi-ai fall
-// back to its URL-based auto-detection. Returns undefined if nothing is set.
-function sanitizeCompat(c: CatalogCompat | undefined, providerId: string, modelId: string): CompatBag | undefined {
-  if (!c) return undefined;
-  const out: CompatBag = {};
-  if (typeof c.supportsDeveloperRole === "boolean") out.supportsDeveloperRole = c.supportsDeveloperRole;
-  if (typeof c.supportsReasoningEffort === "boolean") out.supportsReasoningEffort = c.supportsReasoningEffort;
-  if (c.maxTokensField) {
-    if (KNOWN_MAX_TOKENS_FIELDS.has(c.maxTokensField)) {
-      out.maxTokensField = c.maxTokensField as CompatBag["maxTokensField"];
-    } else {
-      console.warn(`[pi-exe-dev] dropping unknown maxTokensField "${c.maxTokensField}" on ${providerId}/${modelId}`);
-    }
-  }
-  if (c.thinkingFormat) {
-    if (KNOWN_THINKING_FORMATS.has(c.thinkingFormat)) {
-      out.thinkingFormat = c.thinkingFormat as CompatBag["thinkingFormat"];
-    } else {
-      console.warn(`[pi-exe-dev] dropping unknown thinkingFormat "${c.thinkingFormat}" on ${providerId}/${modelId}`);
-    }
-  }
-  if (c.cacheControlFormat) {
-    if (KNOWN_CACHE_CONTROL_FORMATS.has(c.cacheControlFormat)) {
-      out.cacheControlFormat = c.cacheControlFormat as CompatBag["cacheControlFormat"];
-    } else {
-      console.warn(`[pi-exe-dev] dropping unknown cacheControlFormat "${c.cacheControlFormat}" on ${providerId}/${modelId}`);
-    }
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
-// chatModelsWithFullMetadata picks chat models whose metadata is complete
-// enough for pi to register directly. Models with partial metadata are
-// dropped (and logged) rather than silently registered with bogus values.
-// At the provider level, returning an empty list lets pi keep its built-in
-// catalog for that provider — see registerOne.
-function chatModelsWithFullMetadata(p: CatalogProvider): ProviderModelConfig[] {
-  const out: ProviderModelConfig[] = [];
-  const skipped: string[] = [];
-  for (const m of p.models) {
-    if (m.type && m.type !== "chat") continue; // skip embedding/reranker
-    // Use explicit nullish/empty checks so a (hypothetical) zero-valued
-    // contextWindow or maxTokens isn't misread as "missing", and so an
-    // explicit empty input array is treated as missing rather than valid.
-    if (m.name == null || m.contextWindow == null || m.maxTokens == null || !m.input?.length) {
-      // Partial metadata is a Go-side bug (entry in allowedModels, no
-      // gatewayMeta). Surface it instead of hiding the model silently.
-      if (m.name || m.contextWindow != null || m.maxTokens != null || m.input?.length) {
-        skipped.push(m.id);
-      }
-      continue;
-    }
-    const compat = sanitizeCompat(m.compat, p.id, m.id);
-    out.push({
-      id: m.id,
-      name: m.name,
-      reasoning: m.reasoning ?? false,
-      input: m.input,
-      contextWindow: m.contextWindow,
-      maxTokens: m.maxTokens,
-      cost: m.cost,
-      ...(compat ? { compat: compat as ProviderModelConfig["compat"] } : {}),
-    });
-  }
-  if (skipped.length > 0) {
-    console.warn(`[pi-exe-dev] dropping ${p.id} models with incomplete metadata: ${skipped.join(", ")}`);
-  }
-  return out;
-}
-
-// configFromCatalogProvider builds the gateway provider config from the
-// catalog. p.id must be one of pi-ai's KnownProvider names (anthropic, openai,
-// fireworks, ...) because pi merges its built-in catalog by provider name; the
-// Go-side providerCatalog in llmpricing/pricing.go is the source of truth for
-// these IDs.
-function configFromCatalogProvider(p: CatalogProvider): ProviderConfig {
-  const path = p.path.replace(/^\/+/, "");
-  const config: ProviderConfig = {
-    baseUrl: `${GATEWAY}/${path}`,
-    apiKey: "gateway",
-  };
-  if (p.api) {
-    if (KNOWN_APIS.has(p.api)) {
-      config.api = p.api as ProviderConfig["api"];
-    } else {
-      console.warn(`[pi-exe-dev] dropping unknown api "${p.api}" for provider ${p.id}; pi-ai will auto-detect`);
-    }
-  }
-  const models = chatModelsWithFullMetadata(p);
-  // Leaving config.models undefined tells pi to keep its built-in catalog for
-  // this provider. anthropic and openai rely on this — the gateway does not
-  // ship rich metadata for them, only cost.
-  if (models.length > 0) config.models = models;
-  return config;
-}
-
 const FALLBACK_PROVIDER_CONFIGS: Array<[string, ProviderConfig]> = [
   ["anthropic", { baseUrl: `${GATEWAY}/anthropic`, apiKey: "gateway" }],
   ["openai", { baseUrl: `${GATEWAY}/openai/v1`, apiKey: "gateway" }],
@@ -423,23 +259,33 @@ function isGatewayBaseUrl(baseUrl: string | undefined): boolean {
   return baseUrl === GATEWAY || baseUrl?.startsWith(`${GATEWAY}/`) === true;
 }
 
-function providerHasGatewayModels(ctx: ExtensionContext, providerId: string): boolean {
-  return ctx.modelRegistry.getAll().some((m) => m.provider === providerId && isGatewayBaseUrl(m.baseUrl));
+function isManagedBaseUrl(baseUrl: string | undefined, info: GatewayProviderInfo): boolean {
+  if (!baseUrl) return false;
+  return isGatewayBaseUrl(baseUrl) || info.baseUrls.has(baseUrl);
+}
+
+function providerHasManagedModels(ctx: ExtensionContext, providerId: string, info: GatewayProviderInfo): boolean {
+  return ctx.modelRegistry.getAll().some((m) => m.provider === providerId && isManagedBaseUrl(m.baseUrl, info));
 }
 
 type CurrentModel = NonNullable<ExtensionContext["model"]>;
 
-// replacementForCurrentGatewayModel returns a non-gateway model to select
-// after unregistering this extension's provider override. Usually the same
-// model id exists in pi's built-in catalog. For gateway-only catalog entries
-// (notably Fireworks), keep the model metadata but borrow the restored
-// provider's upstream base URL/API/compat so the user's credentials go direct.
-function replacementForCurrentGatewayModel(ctx: ExtensionContext, current: CurrentModel): CurrentModel | undefined {
-  const same = ctx.modelRegistry.find(current.provider, current.id);
-  if (same && !isGatewayBaseUrl(same.baseUrl)) return same;
-  const template = ctx.modelRegistry.getAll().find((m) => m.provider === current.provider && !isGatewayBaseUrl(m.baseUrl));
+// replacementForCurrentManagedModel returns a direct model to select after
+// unregistering this extension's provider override. Usually the same model id
+// exists in pi's built-in catalog. For exe.dev-only catalog entries (notably
+// Fireworks), keep the model metadata but borrow the restored provider's
+// upstream base URL/API/compat so the user's credentials go direct.
+function replacementForCurrentManagedModel(
+  ctx: ExtensionContext,
+  current: CurrentModel,
+  info: GatewayProviderInfo,
+): CurrentModel | undefined {
+  const nativeID = nativeModelIDForGeneratedModel(current.id, info.modelAliases) ?? current.id;
+  const same = ctx.modelRegistry.find(current.provider, nativeID);
+  if (same && !isManagedBaseUrl(same.baseUrl, info)) return same;
+  const template = ctx.modelRegistry.getAll().find((m) => m.provider === current.provider && !isManagedBaseUrl(m.baseUrl, info));
   if (!template) return undefined;
-  return { ...current, baseUrl: template.baseUrl, api: template.api, compat: template.compat };
+  return { ...current, id: nativeID, baseUrl: template.baseUrl, api: template.api, compat: template.compat };
 }
 
 let procEnvCache: Map<string, string> | null = null;
@@ -483,28 +329,52 @@ function gatewayDisabled(): boolean {
   return TRUTHY_KILL_SWITCH.has(v.toLowerCase());
 }
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
   // Only activate on exe.dev VMs.
   if (!existsSync("/exe.dev")) return;
 
   const disabled = gatewayDisabled();
+  let llmIntegrationPreference: LLMIntegrationPreference | undefined =
+    readLLMIntegrationPreference(LLM_INTEGRATION_PREFERENCE_FILE);
 
   const gatewayInfos = new Map<string, GatewayProviderInfo>();
+  let routeLabel = "exe.dev gateway";
+  let availableIntegrationsLabel = routeLabel;
   const loaded = loadCatalogSync();
-  if (loaded) {
+  const discovered = await discoverIntegrationCatalogs(REFLECTION_INTEGRATIONS_URLS, (url) =>
+    fetchJSONWithTimeout(url, FETCH_TIMEOUT_MS),
+  );
+  const usingReflectedIntegration = discovered.found;
+  if (discovered.found) {
+    const integrationNames = discovered.integrations.map((integration) => integration.name);
+    routeLabel = integrationProviderDisplayName(integrationNames);
+    availableIntegrationsLabel = integrationPromptAvailabilityLabel(integrationNames);
+    for (const [id, info] of providerInfosFromIntegrationCatalogs(discovered.integrations, loaded?.catalog)) {
+      gatewayInfos.set(id, info);
+    }
+    if (gatewayInfos.size === 0 && !disabled) {
+      console.warn(`[pi-exe-dev] LLM integration discovered, but no supported models were available`);
+    }
+  } else if (loaded) {
     for (const p of loaded.catalog.providers) {
       const modelIds = new Set(p.models.map((m) => m.id));
-      gatewayInfos.set(p.id, {
-        config: configFromCatalogProvider(p),
-        modelIds: modelIds.size > 0 ? modelIds : undefined,
-      });
+      gatewayInfos.set(
+        p.id,
+        providerInfo(configFromCatalogProvider(p, GATEWAY), {
+          modelIds: modelIds.size > 0 ? modelIds : undefined,
+        }),
+      );
     }
   } else {
     if (!disabled) {
       console.warn(`[pi-exe-dev] no usable catalog; falling back to pi's built-in models for anthropic/openai/fireworks`);
     }
-    for (const [id, config] of FALLBACK_PROVIDER_CONFIGS) gatewayInfos.set(id, { config });
+    for (const [id, config] of FALLBACK_PROVIDER_CONFIGS) gatewayInfos.set(id, providerInfo(config));
   }
+
+  const llmIntegrationRoutingEnabled = (): boolean => {
+    return !usingReflectedIntegration || llmIntegrationPreference !== "skip";
+  };
 
   const registerGateway = (id: string, info: GatewayProviderInfo): boolean => {
     try {
@@ -517,19 +387,19 @@ export default function (pi: ExtensionAPI) {
   };
 
   const userConfiguredAtLoad = loadUserConfiguredProviders(gatewayInfos);
-  if (!disabled) {
+  if (!disabled && llmIntegrationRoutingEnabled()) {
     for (const [id, info] of gatewayInfos) {
       if (userConfiguredAtLoad.has(id)) continue;
       registerGateway(id, info);
     }
   }
 
-  const selectDirectReplacement = async (ctx: ExtensionContext, id: string): Promise<void> => {
+  const selectDirectReplacement = async (ctx: ExtensionContext, id: string, info: GatewayProviderInfo): Promise<void> => {
     const current = ctx.model;
-    if (current?.provider !== id || !isGatewayBaseUrl(current.baseUrl)) return;
-    const replacement = replacementForCurrentGatewayModel(ctx, current);
+    if (current?.provider !== id || !isManagedBaseUrl(current.baseUrl, info)) return;
+    const replacement = replacementForCurrentManagedModel(ctx, current, info);
     if (!replacement) {
-      console.warn(`[pi-exe-dev] no non-gateway replacement for current model ${current.id}; pick a new model`);
+      console.warn(`[pi-exe-dev] no direct replacement for current model ${current.id}; pick a new model`);
       return;
     }
     try {
@@ -555,12 +425,12 @@ export default function (pi: ExtensionAPI) {
       const userConfigured = loadUserConfiguredProviders(gatewayInfos, ctx);
       let refreshedForRestore = false;
       for (const [id, info] of gatewayInfos) {
-        const hasGateway = providerHasGatewayModels(ctx, id);
-        const wantsGateway = !disabled && !userConfigured.has(id);
-        if (hasGateway && !wantsGateway) {
+        const hasManaged = providerHasManagedModels(ctx, id, info);
+        const wantsManaged = !disabled && llmIntegrationRoutingEnabled() && !userConfigured.has(id);
+        if (hasManaged && !wantsManaged) {
           pi.unregisterProvider(id);
-          await selectDirectReplacement(ctx, id);
-        } else if (!hasGateway && wantsGateway) {
+          await selectDirectReplacement(ctx, id, info);
+        } else if (!hasManaged && wantsManaged) {
           if (!refreshedForRestore) {
             ctx.modelRegistry.refresh();
             refreshedForRestore = true;
@@ -573,15 +443,86 @@ export default function (pi: ExtensionAPI) {
     }
   };
 
-  const routingForNotice = (ctx: ExtensionContext): { gateway: string[]; userConfig: string[] } => {
+  const routingForNotice = (ctx: ExtensionContext): { managed: string[]; userConfig: string[] } => {
     const userConfigured = loadUserConfiguredProviders(gatewayInfos, ctx);
-    const gateway: string[] = [];
+    const managed: string[] = [];
     const userConfig: string[] = [];
-    for (const id of gatewayInfos.keys()) {
-      if (providerHasGatewayModels(ctx, id)) gateway.push(id);
+    for (const [id, info] of gatewayInfos) {
+      if (providerHasManagedModels(ctx, id, info)) managed.push(id);
       else if (userConfigured.has(id)) userConfig.push(id);
     }
-    return { gateway: gateway.sort(), userConfig: userConfig.sort() };
+    return { managed: managed.sort(), userConfig: userConfig.sort() };
+  };
+
+  const availableModelsForPreference = (ctx: ExtensionContext, preference: LLMIntegrationPreference): CurrentModel[] => {
+    return ctx.modelRegistry
+      .getAvailable()
+      .filter((model) => {
+        const info = gatewayInfos.get(model.provider);
+        const managed = !!info && isManagedBaseUrl(model.baseUrl, info);
+        return preference === "use" ? managed : !managed;
+      });
+  };
+
+  const selectDefaultInitialModel = async (ctx: ExtensionContext, preference: LLMIntegrationPreference): Promise<void> => {
+    const models = availableModelsForPreference(ctx, preference);
+    if (models.length === 0) {
+      if (preference === "use" && usingReflectedIntegration) {
+        ctx.ui.notify(`No models were found in ${routeLabel}. Configure pi manually, then use /model to select a model.`, "error");
+      } else {
+        ctx.ui.notify("No models are available for this choice. Configure pi, then use /model to select a model.", "error");
+      }
+      return;
+    }
+
+    const model = chooseDefaultModel(models);
+    if (!model) {
+      ctx.ui.notify("No models are available for this choice. Configure pi, then use /model to select a model.", "error");
+      return;
+    }
+    const ok = await pi.setModel(model);
+    if (!ok) {
+      ctx.ui.notify(`Could not select ${modelChoiceLabel(model)}. Use /model to select a model.`, "error");
+      return;
+    }
+    const theme = ctx.ui.theme;
+    ctx.ui.notify(
+      `${theme.bold(theme.fg("warning", "Selected model:"))} ${theme.fg("accent", modelChoiceLabel(model))}. ${theme.fg("muted", "Use")} ${theme.fg("accent", "/model")} ${theme.fg("muted", "to select a different model later.")}`,
+      "info",
+    );
+  };
+
+  const promptForLLMIntegrationPreference = async (ctx: ExtensionContext): Promise<boolean> => {
+    if (!usingReflectedIntegration || disabled || llmIntegrationPreference != null) return false;
+    if (!ctx.hasUI) return false;
+    if (gatewayInfos.size > 0 && routingForNotice(ctx).managed.length === 0) return false;
+
+    const promptTitle = [
+      "Use exe.dev LLM integrations?",
+      "Automatically configure pi to use models from this VM's attached LLM integrations instead of configuring pi manually.",
+    ].join("\n");
+    const availableLabel = `[${availableIntegrationsLabel}]`;
+    const useLabel = `Use exe.dev LLM integration ${availableLabel}`;
+    const directLabel = "I'll configure pi myself";
+    const choice = await ctx.ui.select(promptTitle, [useLabel, directLabel]);
+    const decision = llmIntegrationPromptDecision(choice, useLabel, directLabel);
+
+    llmIntegrationPreference = decision.preference;
+    if (decision.persist) {
+      try {
+        writeLLMIntegrationPreference(LLM_INTEGRATION_PREFERENCE_FILE, llmIntegrationPreference);
+      } catch (err) {
+        ctx.ui.notify(`Could not save LLM routing preference: ${(err as Error).message}`, "warning");
+      }
+    }
+
+    await sync(ctx);
+    if (decision.selectDefaultModel) {
+      await selectDefaultInitialModel(ctx, llmIntegrationPreference);
+    } else if (decision.persist) {
+      ctx.ui.notify("Use /login to add credentials, then /model to select a model.", "info");
+    }
+    return true;
   };
 
   // Surface routing once on startup/reload. Stay quiet in the common all-gateway
@@ -591,17 +532,21 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     if (event.reason !== "startup" && event.reason !== "reload") return;
     await sync(ctx);
+    const prompted = await promptForLLMIntegrationPreference(ctx);
+    if (prompted) return;
     if (!ctx.hasUI) return;
 
     const routing = routingForNotice(ctx);
     let message: string | undefined;
     if (disabled) {
-      message = "exe.dev gateway disabled (EXE_DEV_DISABLE_GATEWAY); using your own provider credentials.";
+      message = "exe.dev LLM routing disabled (EXE_DEV_DISABLE_GATEWAY); using your own provider credentials.";
+    } else if (usingReflectedIntegration && llmIntegrationPreference === "skip") {
+      message = `Using pi direct config instead of ${routeLabel}.`;
     } else if (routing.userConfig.length > 0) {
       const parts = [`Using your credentials/config for: ${routing.userConfig.join(", ")}.`];
-      if (routing.gateway.length > 0) {
-        parts.push(`Using exe.dev gateway for: ${routing.gateway.join(", ")}.`);
-        parts.push("Set EXE_DEV_DISABLE_GATEWAY=1 to bypass the gateway entirely.");
+      if (routing.managed.length > 0) {
+        parts.push(`Using ${routeLabel} for: ${routing.managed.join(", ")}.`);
+        parts.push("Set EXE_DEV_DISABLE_GATEWAY=1 to bypass exe.dev LLM routing entirely.");
       }
       message = parts.join(" ");
     }
@@ -617,7 +562,8 @@ export default function (pi: ExtensionAPI) {
     const fingerprint = JSON.stringify({
       v: 1,
       disabled,
-      gateway: routing.gateway,
+      llmIntegrationPreference,
+      managed: routing.managed,
       userCreds: routing.userConfig,
     });
     if (event.reason === "startup") {
@@ -638,7 +584,20 @@ export default function (pi: ExtensionAPI) {
   pi.on("input", async (_event, ctx) => sync(ctx));
   pi.on("model_select", async (_event, ctx) => sync(ctx));
 
-  // Refresh the on-disk cache so the next pi launch starts from fresh data.
+  pi.on("before_provider_request", (event, ctx) => {
+    const model = ctx.model;
+    if (!model) return undefined;
+    const info = gatewayInfos.get(model.provider);
+    if (!info || !isManagedBaseUrl(model.baseUrl, info)) return undefined;
+    return rewriteIntegrationProviderPayload(event.payload, {
+      modelAliases: info.modelAliases,
+      chatGPTModelIds: info.chatGPTModelIds,
+      selectedModelID: model.id,
+    });
+  });
+
+  // Refresh the gateway cache so the next pi launch has fresh pricing/compat
+  // fallback data even when current models come from integration catalogs.
   void refreshCatalogAsync();
 
   // Inject exe.dev context into the system prompt.
