@@ -1,6 +1,15 @@
 # Stage 1: Get Chrome/Chromium from chromedp/headless-shell
 FROM docker.io/chromedp/headless-shell:stable AS chrome
 
+# Build the guest-facing exeuntu helper.
+FROM docker.io/library/golang:1.26.5 AS exeuntu-cli
+ARG EXEUNTU_GIT_VERSION=unknown
+WORKDIR /src/exeuntu-cli
+COPY cli/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -tags osusergo,netgo \
+        -ldflags "-X main.gitVersion=${EXEUNTU_GIT_VERSION} -extldflags=-static -s -w" \
+        -o /out/exeuntu .
+
 FROM ubuntu:24.04
 
 # Use bash for Docker RUN instructions.
@@ -33,13 +42,13 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirror://mirrors.ubuntu.c
 	mandb -c && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		ca-certificates wget ripgrep \
+		locales locales-all \
 		git jq sqlite3 curl vim neovim fish lsof iproute2 less nginx \
 		make python3-pip python-is-python3 tree net-tools file build-essential \
 		pipx psmisc bsdmainutils sudo socat \
 		openssh-server openssh-client \
+		libcap2-bin unzip util-linux rsync \
 		iputils-ping socat netcat-openbsd \
-		libcap2-bin \
-		unzip util-linux rsync \
 		ubuntu-server ubuntu-dev-tools ubuntu-standard \
 		man-db manpages manpages-dev \
 		mitmproxy \
@@ -77,6 +86,8 @@ RUN ARCH=$(dpkg --print-architecture) && \
     curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz" | tar -xzC /usr/local && \
     ln -s /usr/local/go/bin/go /usr/local/bin/go && \
     ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
+COPY --from=exeuntu-cli /out/exeuntu /usr/local/bin/exeuntu
 
 # Install uv to /usr/local/bin
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
@@ -286,27 +297,18 @@ RUN cp /home/lk/.codex/AGENTS.md /home/lk/.pi/AGENTS.md && \
     /usr/local/bin/sync-codex-catalogs --out /home/lk/.codex/model-catalogs/ormc-models.json --force && \
     chown -R lk:lk /home/lk/.codex /home/lk/.pi
 
-# Install pi (pi-coding-agent) standalone binary
+# Install pi (pi-coding-agent) through exeuntu's updater.
 ARG PI_VERSION=
-RUN case "$(uname -m)" in \
-        x86_64) ARCH="x64" ;; \
-        aarch64|arm64) ARCH="arm64" ;; \
-        *) echo "Unsupported architecture: $(uname -m)" && exit 1 ;; \
-    esac && \
-    if [ -z "${PI_VERSION}" ]; then \
-        # Pi's updater follows the npm package. GitHub's latest release and
-        # latest/download URLs can lag behind, so resolve via npm and fetch the
-        # matching tagged GitHub asset. Revisit if upstream makes them agree.
-        PI_VERSION=$(curl -fsSL https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest | jq -r '.version'); \
+USER lk
+RUN if [ -n "${PI_VERSION}" ]; then \
+        exeuntu update pi --home /home/lk --version "${PI_VERSION}"; \
+    else \
+        exeuntu update pi --home /home/lk; \
     fi && \
-    PI_TAG="v${PI_VERSION#v}" && \
-    curl -fsSL "https://github.com/earendil-works/pi/releases/download/${PI_TAG}/pi-linux-${ARCH}.tar.gz" | \
-    tar xz -C /home/lk/.local/ && \
-    test "$(/home/lk/.local/pi/pi --version)" = "${PI_TAG#v}" && \
-    mkdir -p /home/lk/.local/bin && \
-    ln -sf /home/lk/.local/pi/pi /home/lk/.local/bin/pi && \
-    chown -R lk:lk /home/lk/.local/pi && \
-    ln -sf /home/lk/.local/bin/pi /usr/local/bin/pi
+    test -x /home/lk/.local/bin/pi && \
+    /home/lk/.local/bin/pi --version
+USER root
+RUN ln -sf /home/lk/.local/bin/pi /usr/local/bin/pi
 
 # Install pi exe.dev extension (LLM gateway + environment context).
 # Pre-fetch catalog.json so the first request Just Works immediately.
@@ -328,7 +330,7 @@ RUN ARCH=$(uname -m) && \
         aarch64|arm64) FD_ARCH="aarch64-unknown-linux-gnu" ;; \
         *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
     esac && \
-    FD_VERSION=$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest | jq -r '.tag_name') && \
+    FD_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/sharkdp/fd/releases/latest | sed 's|.*/tag/||') && \
     mkdir -p /home/lk/.pi/agent/bin && \
     TMPDIR=$(mktemp -d) && \
     curl -fsSL "https://github.com/sharkdp/fd/releases/download/${FD_VERSION}/fd-${FD_VERSION}-${FD_ARCH}.tar.gz" | \

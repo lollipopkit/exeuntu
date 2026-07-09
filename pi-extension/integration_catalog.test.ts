@@ -8,11 +8,7 @@ import {
   type JSONFetcher,
 } from "./integration_catalog.ts";
 
-const reflectionURLs = [
-  "https://reflection.int.exe.xyz/integrations",
-  "https://reflection.int.exe.cloud/integrations",
-  "http://reflection.int.exe.cloud/integrations",
-];
+const reflectionURL = "https://reflection.int.exe.xyz/integrations";
 
 function openAIGPTModel(mode: "managed" | "chatgpt") {
   return {
@@ -27,6 +23,19 @@ function openAIGPTModel(mode: "managed" | "chatgpt") {
   };
 }
 
+function anthropicModel(id: string, name: string) {
+  return {
+    id: `anthropic/${id}`,
+    name,
+    provider: "anthropic",
+    native_id: id,
+    apis: ["anthropic_messages"],
+    limits: { context_window: 128000, max_output_tokens: 32000 },
+    architecture: { input_modalities: ["text"] },
+    exe_dev: { mode: "managed" },
+  };
+}
+
 test("discovers reflection integrations and model catalogs without serial catalog probing", async () => {
   let activeCatalogFetches = 0;
   let maxActiveCatalogFetches = 0;
@@ -36,7 +45,11 @@ test("discovers reflection integrations and model catalogs without serial catalo
     if (url.endsWith("/integrations")) {
       return {
         integrations: [
-          { type: "llm", name: "beta", help: "try https://beta-help.int.exe.xyz for models" },
+          {
+            type: "llm",
+            name: "beta",
+            help: "try https://beta-help.int.exe.xyz for models, not legacy https://beta.int.exe.cloud",
+          },
           { type: "llm", name: "alpha" },
           { type: "reflection", name: "ignore-me" },
         ],
@@ -52,7 +65,7 @@ test("discovers reflection integrations and model catalogs without serial catalo
     return undefined;
   };
 
-  const discovered = await discoverIntegrationCatalogs(reflectionURLs, fetchJSON);
+  const discovered = await discoverIntegrationCatalogs(reflectionURL, fetchJSON);
 
   assert.equal(discovered.found, true);
   assert.deepEqual(
@@ -61,6 +74,7 @@ test("discovers reflection integrations and model catalogs without serial catalo
   );
   assert.ok(fetched.includes("https://alpha.int.exe.xyz/models.json"));
   assert.ok(fetched.includes("https://beta-help.int.exe.xyz/models.json"));
+  assert.equal(fetched.some((url) => url.includes(".exe.cloud")), false);
   assert.ok(maxActiveCatalogFetches > 1, `catalog fetches were serial; max active was ${maxActiveCatalogFetches}`);
 });
 
@@ -71,7 +85,7 @@ test("keeps integration ownership when reflection succeeds but catalogs fail", a
     throw new Error("offline");
   };
 
-  const discovered = await discoverIntegrationCatalogs(reflectionURLs, fetchJSON, (message) => warnings.push(message));
+  const discovered = await discoverIntegrationCatalogs(reflectionURL, fetchJSON, (message) => warnings.push(message));
 
   assert.equal(discovered.found, true);
   assert.equal(discovered.integrations.length, 1);
@@ -100,7 +114,7 @@ test("discovers team llm integrations through team hosts", async () => {
     return undefined;
   };
 
-  const discovered = await discoverIntegrationCatalogs(reflectionURLs, fetchJSON);
+  const discovered = await discoverIntegrationCatalogs(reflectionURL, fetchJSON);
 
   assert.equal(discovered.found, true);
   assert.deepEqual(
@@ -160,6 +174,62 @@ test("preserves duplicate model names and marks ChatGPT rewrites by generated mo
   assert.equal(openai.chatGPTModelIds?.has("gpt-5.5@chatgpt-sub"), true);
   assert.equal(openai.chatGPTModelIds?.has("gpt-5.5"), false);
   assert.deepEqual(Array.from(openai.modelIds ?? []).sort(), ["gpt-5.5@chatgpt-sub", "gpt-5.5@managed-sub"]);
+});
+
+test("preserves reflected catalog model order for provider configs", () => {
+  const pricingCatalog: Catalog = {
+    schemaVersion: 1,
+    providers: [
+      {
+        id: "anthropic",
+        path: "anthropic",
+        models: [
+          {
+            id: "claude-opus-4-8",
+            name: "Claude Opus 4.8",
+            type: "chat",
+            input: ["text"],
+            contextWindow: 128000,
+            maxTokens: 32000,
+            cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.2 },
+          },
+          {
+            id: "claude-fable-5",
+            name: "Claude Fable 5",
+            type: "chat",
+            input: ["text"],
+            contextWindow: 128000,
+            maxTokens: 32000,
+            cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.2 },
+          },
+        ],
+      },
+    ],
+  };
+  const infos = providerInfosFromIntegrationCatalogs(
+    [
+      {
+        name: "llm",
+        baseURL: "https://llm.int.exe.xyz",
+        catalog: {
+          schema_version: 1,
+          models: [
+            anthropicModel("claude-opus-4-8", "Claude Opus 4.8"),
+            anthropicModel("claude-fable-5", "Claude Fable 5"),
+          ],
+        },
+      },
+    ],
+    pricingCatalog,
+    (message) => assert.fail(`unexpected warning: ${message}`),
+  );
+
+  const anthropic = infos.get("anthropic");
+  assert.ok(anthropic);
+  assert.deepEqual(
+    anthropic.config.models?.map((model) => model.id),
+    ["claude-opus-4-8@llm", "claude-fable-5@llm"],
+  );
 });
 
 test("warns once when integration pricing is absent", () => {
