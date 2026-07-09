@@ -276,9 +276,10 @@ RUN chmod 644 /etc/systemd/system/apt-auto-upgrade.service /etc/systemd/system/a
 # It would be better if you could indicate that via an env variable or something.
 COPY init-wrapper.sh /usr/local/bin/init
 
-# Install native codex; installs to /usr/local/bin
-RUN curl -fsSL https://chatgpt.com/codex/install.sh | \
-    CODEX_HOME=/usr/local/lib/codex CODEX_INSTALL_DIR=/usr/local/bin CODEX_NON_INTERACTIVE=1 sh
+# Install native codex through exeuntu's direct updater; installs to /usr/local/bin
+RUN exeuntu update codex && \
+    test -x /usr/local/bin/codex && \
+    /usr/local/bin/codex --version
 
 # Create config directories for LLM agents
 RUN mkdir -p /home/lk/.codex /home/lk/.pi && \
