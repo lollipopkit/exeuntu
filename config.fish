@@ -22,7 +22,7 @@ set -x FIH $HOME/.local/share/fish/fish_history
 set -gx NVM_DIR $HOME/.nvm
 set -gx BUN_INSTALL "$HOME/.bun"
 
-if not command -q npm; and type -q nvm
+if status is-interactive; and not command -q npm; and type -q nvm
     nvm install lts
     nvm use lts
 end
